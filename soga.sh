@@ -95,24 +95,32 @@ install() {
 }
 
 update() {
-    confirm "本功能会强制重装当前最新版，数据不会丢失，是否继续?" "n"
-    if [[ $? != 0 ]]; then
-        echo -e "${red}已取消${plain}"
-        if [[ $# == 0 ]]; then
-            before_show_menu
-        fi
-        return 0
+    if [[ $# == 0 ]]; then
+        echo && echo -n -e "输入指定版本(默认最新版): " && read version
+    else
+        version=$2
     fi
-    bash <(curl -Ls https://blog.sprov.xyz/soga.sh)
-    if [[ $? == 0 ]]; then
-        echo -e "${green}更新完成，已自动重启 soga${plain}"
-        exit
-#        if [[ $# == 0 ]]; then
-#            restart
-#        else
-#            restart 0
+#    confirm "本功能会强制重装当前最新版，数据不会丢失，是否继续?" "n"
+#    if [[ $? != 0 ]]; then
+#        echo -e "${red}已取消${plain}"
+#        if [[ $1 != 0 ]]; then
+#            before_show_menu
 #        fi
+#        return 0
+#    fi
+    bash <(curl -Ls https://blog.sprov.xyz/soga.sh) $version
+    if [[ $? == 0 ]]; then
+        echo -e "${green}更新完成，已自动重启 soga，请使用 soga log 查看运行日志${plain}"
+        exit
     fi
+
+    if [[ $# == 0 ]]; then
+        before_show_menu
+    fi
+}
+
+config() {
+    soga-tool $*
 }
 
 uninstall() {
@@ -150,7 +158,7 @@ start() {
         sleep 2
         check_status
         if [[ $? == 0 ]]; then
-            echo -e "${green}soga 启动成功${plain}"
+            echo -e "${green}soga 启动成功，请使用 soga log 查看运行日志${plain}"
         else
             echo -e "${red}soga可能启动失败，请稍后使用 soga log 查看日志信息${plain}"
         fi
@@ -162,19 +170,13 @@ start() {
 }
 
 stop() {
+    systemctl stop soga
+    sleep 2
     check_status
     if [[ $? == 1 ]]; then
-        echo ""
-        echo -e "${green}soga已停止，无需再次停止${plain}"
+        echo -e "${green}soga 停止成功${plain}"
     else
-        systemctl stop soga
-        sleep 2
-        check_status
-        if [[ $? == 1 ]]; then
-            echo -e "${green}soga 停止成功${plain}"
-        else
-            echo -e "${red}soga停止失败，可能是因为停止时间超过了两秒，请稍后查看日志信息${plain}"
-        fi
+        echo -e "${red}soga停止失败，可能是因为停止时间超过了两秒，请稍后查看日志信息${plain}"
     fi
 
     if [[ $# == 0 ]]; then
@@ -187,7 +189,7 @@ restart() {
     sleep 2
     check_status
     if [[ $? == 0 ]]; then
-        echo -e "${green}soga 重启成功${plain}"
+        echo -e "${green}soga 重启成功，请使用 soga log 查看运行日志${plain}"
     else
         echo -e "${red}soga可能启动失败，请稍后使用 soga log 查看日志信息${plain}"
     fi
@@ -230,7 +232,7 @@ disable() {
 }
 
 show_log() {
-    journalctl -u soga.service -e --no-pager
+    journalctl -u soga.service -e --no-pager -f
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
@@ -259,21 +261,6 @@ update_shell() {
         chmod +x /usr/bin/soga
         echo -e "${green}升级脚本成功，请重新运行脚本${plain}" && exit 0
     fi
-}
-
-update_v2ray() {
-#    bash <(curl -L -s https://install.direct/go.sh)
-#    if [[ $? != 0 ]]; then
-#        echo ""
-#        echo -e "${red}更新 v2ray 失败，请自行检查错误信息${plain}"
-#        echo ""
-#    else
-#        echo ""
-#        echo -e "${green}更新 v2ray 成功${plain}"
-#        echo ""
-#    fi
-    echo "暂时没有此功能"
-    before_show_menu
 }
 
 # 0: running, 1: not running, 2: not installed
@@ -372,14 +359,16 @@ show_usage() {
     echo "soga disable      - 取消 soga 开机自启"
     echo "soga log          - 查看 soga 日志"
     echo "soga update       - 更新 soga"
+    echo "soga update x.x.x - 更新 soga 指定版本"
     echo "soga install      - 安装 soga"
     echo "soga uninstall    - 卸载 soga"
+    echo "soga version      - 查看 soga 版本"
     echo "------------------------------------------"
 }
 
 show_menu() {
     echo -e "
-  ${green}soga 后端管理脚本${plain}
+  ${green}soga 后端管理脚本，${plain}${red}不适用于docker${plain}
 --- https://github.com/sprov065/soga ---
   ${green}0.${plain} 退出脚本
 ————————————————
@@ -451,7 +440,9 @@ if [[ $# > 0 ]]; then
         ;;
         "log") check_install 0 && show_log 0
         ;;
-        "update") check_install 0 && update 0
+        "update") check_install 0 && update 0 $2
+        ;;
+        "config") config $*
         ;;
         "install") check_uninstall 0 && install 0
         ;;
